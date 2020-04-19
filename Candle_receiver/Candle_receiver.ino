@@ -13,7 +13,7 @@
 
 // You can enable and disable the settings below by adding or removing double slashes ( // ) in front of a line.
 
-//#define SHOW_TRANSMISSION_DETAILS                 // Show transmission details. If you enable this, the receiver will shown as a separate device. It will have details about how many auccesful and how many failed transmission are made. These values are updated every 5 minutes.
+#define SHOW_TRANSMISSION_DETAILS                 // Show transmission details. If you enable this, the receiver will shown as a separate device. It will have details about how many auccesful and how many failed transmission are made. These values are updated every 5 minutes.
 
 #define RF_NANO                                     // RF-Nano. Enable this if you are using the RF-Nano Arduino, which has a built in radio. The Candle project uses the RF-Nano.
 
@@ -48,8 +48,8 @@
 #define MY_RF24_PA_LEVEL RF24_PA_MAX                // Sets the radio to transmit at maximum power, for optimum range.
 
 // Mysensors advanced security
-#define MY_ENCRYPTION_SIMPLE_PASSWD "changeme"      // The Candle Manager add-on will change this into the actual password your network uses.
-//#define MY_SECURITY_SIMPLE_PASSWD "changeme"      // Be aware, the length of the password has an effect on memory use.
+#define MY_ENCRYPTION_SIMPLE_PASSWD "A2Ed8vCV"      // The Candle Manager add-on will change this into the actual password your network uses.
+//#define MY_SECURITY_SIMPLE_PASSWD "A2Ed8vCV"      // Be aware, the length of the password has an effect on memory use.
 //#define MY_SIGNING_SOFT_RANDOMSEED_PIN A7         // Setting a pin to pickup random electromagnetic noise helps make encryption more secure.
 
 // Mysensors advanced settings
@@ -117,7 +117,7 @@ void presentation()
 
 void setup()
 {
-  //Serial.println(F("Hello, I am a Candle receiver"));
+  Serial.println(F("Hello, I am a Candle receiver"));
 
   send(transmission_quality_message.setSensor(CHILD_ID_TX_OK).set(txOK)); // Send the good transmissions value
   send(transmission_quality_message.setSensor(CHILD_ID_TX_ERR).set(txERR)); // Send the failed transmissions value
