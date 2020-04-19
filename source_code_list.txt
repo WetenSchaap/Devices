@@ -1,0 +1,20 @@
+{
+    "sketch_urls": [
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Alarm_clock/Alarm_clock.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Anemone/Anemone.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Candle_cleaner/Candle_cleaner.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Candle_receiver/Candle_receiver.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Energy_use_meter/Energy_use_meter.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Temperature_and_more/Temperature_and_more.ino",
+	"https://raw.githubusercontent.com/WetenSchaap/Devices/master/Temperature_and_more/temperature_and_more_ADAFruit.ino"
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Plant_health/Plant_health.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Signal-hub/Signal-hub.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Candle_maker_tool/Candle_maker_tool.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Dust_sensor/Dust_sensor.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Carbon_sensor/Carbon_sensor.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Smart_lock/Smart_lock.ino",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Smart_lock/SoftwareSerial.h",
+        "https://raw.githubusercontent.com/createcandle/Devices/master/Smart_lock/SoftwareSerial.cpp"
+    ]
+}
+
