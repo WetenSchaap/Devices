@@ -14,19 +14,21 @@
 
 
 
-//#define HAS_CO_SENSOR                             // Have you attached a CO sensor?
+#define HAS_CO_SENSOR                               // Have you attached a CO sensor?
 
 #define HAS_CO2_SENSOR                              // Have you attached a CO2 sensor?
 
-#define MEASUREMENT_INTERVAL 60                     // How many seconds do you want between each measurement? The minimum is 10 seconds.
+#define MEASUREMENT_INTERVAL 90                     // How many seconds do you want between each measurement? For CO sensor, we need 90 sec interval!
 
 #define HAS_DISPLAY                                 // Does the sensor have a little OLED display attached?
 
-#define ALLOW_CONNECTING_TO_NETWORK                 // Connect wirelessly. Is this device allowed to connect to the local Candle network? For privacy or security reasons you may prefer a stand-alone device.
+#define HAS_PASSIVE_BUZZER                          // Does the sensor have a passive buzzer?
 
-#define ALLOW_FAKE_DATA                             // Allow fake data? This feature is designed to make the sensor less intrusive in some social situations. If enabled, you can toggle this ability by pressing a button that you will need to connect as well. When fake data is being generated, a small F icon is visible on the display.
+//#define ALLOW_CONNECTING_TO_NETWORK                 // Connect wirelessly. Is this device allowed to connect to the local Candle network? For privacy or security reasons you may prefer a stand-alone device.
 
-#define MY_REPEATER_FEATURE                       // Act as a repeater? The devices can pass along messages to each other to increase the range of your network.
+//#define ALLOW_FAKE_DATA                             // Allow fake data? This feature is designed to make the sensor less intrusive in some social situations. If enabled, you can toggle this ability by pressing a button that you will need to connect as well. When fake data is being generated, a small F icon is visible on the display.
+
+//#define MY_REPEATER_FEATURE                       // Act as a repeater? The devices can pass along messages to each other to increase the range of your network.
 
 #define RF_NANO                                     // RF-Nano. Check this box if you are using the RF-Nano Arduino, which has a built in radio. The Candle project uses the RF-Nano.
 
@@ -51,7 +53,7 @@
 
 // Mysensors security
 #define MY_ENCRYPTION_SIMPLE_PASSWD "A2Ed8vCV"      // Be aware, the length of the password has an effect on memory use.
-//#define MY_SECURITY_SIMPLE_PASSWD "changeme"      // Be aware, the length of the password has an effect on memory use.
+//#define MY_SECURITY_SIMPLE_PASSWD "A2Ed8vCV"      // Be aware, the length of the password has an effect on memory use.
 //#define MY_SIGNING_SOFT_RANDOMSEED_PIN A7         // Setting a pin to pickup random electromagnetic noise helps make encryption more secure.
 
 // Mysensors advanced settings
@@ -65,15 +67,15 @@
 
 // PINS
 // Be aware, on the RF-Nano pins 9 through 13 are used by the radio.
-#define CO_RX_PIN 3                                 // The RX (receive) pin for the CO sensor. This should be connected to the TX (transmit) pin on the sensor module.
-#define CO_TX_PIN 4                                 // The TX (transmit) pin for the CO sensor. This should be connected to the RX (receive) pin on the sensor module.
+#define analogMQ7CO 3                               // CO sensor analogue signal pin 
+#define ledPinMQ7CO 2                               // Pin for LEds on CO sensor
 #define CO2_RX_PIN 5                                // The RX (receive) pin for the CO2 sensor. This should be connected to the TX (transmit) pin on the sensor module.
 #define CO2_TX_PIN 6                                // The TX (transmit) pin for the CO2 sensor. This should be connected to the RX (receive) pin on the sensor module.
-
+#define BUZPIN 8
 
 #define HORIZONTAL_START_POSITION 0                // Pixels from the left of the screen
-#define DATA_TRANSMISSION_BUTTON_PIN 8
-#define TOGGLE_FAKE_DATA_PIN 7
+#define DATA_TRANSMISSION_BUTTON_PIN 12
+#define TOGGLE_FAKE_DATA_PIN 10
 
 
 #ifdef RF_NANO
@@ -104,14 +106,14 @@
 
 #ifdef HAS_CO_SENSOR
 // CO sensor variables
-SoftwareSerial co_sensor(CO_RX_PIN, CO_TX_PIN);     // Receive (RX) and transmit (TX) pins. RX should always connect to TX on the opposite device.
 int COValue = 0;
+int Heatstatus = 1;
 #endif
 
 
 #ifdef HAS_CO2_SENSOR
 // CO2 sensor variables
-SoftwareSerial co2_sensor(CO2_RX_PIN, CO2_TX_PIN);  // Receive (RX) and transmit (TX) pins. RX should always connect to TX on the opposite device.
+SoftwareSerial co2_sensor(CO2_TX_PIN, CO2_RX_PIN);  // Receive (RX) and transmit (TX) pins. RX should always connect to TX on the opposite device.
 int co2_value = 0;
 float average_co2_value = 400;                            
 #endif
@@ -136,7 +138,7 @@ MyMessage CO_message(CO_CHILD_ID, V_LEVEL);         // Sets up the message forma
 #endif
 
 #ifdef HAS_CO2_SENSOR
-MyMessage CO2_message(CO2_CHILD_ID, V_LEVEL);      // Sets up the message format that we'll be sending to the controller.
+MyMessage CO2_message(CO2_CHILD_ID, V_LEVEL);        // Sets up the message format that we'll be sending to the controller.
 MyMessage info_message(CO2_OPINION_CHILD_ID,V_TEXT); // Sets up the message format that we'll be sending to the controller. The first part is the ID of the specific sensor module on this node. The second part describes what kind of data to expect.
 
 #endif
@@ -170,7 +172,20 @@ boolean previous_transmission_state = true;
 #define LOOPDURATION 1000                           // The main loop runs every x milliseconds.  Normally this sensor has a 'heartbeat' of once every second.
 boolean send_all_values = true;                     // If the controller asks the devive to re-present itself, then this is used to also resend all the current sensor values.
 
+// Here I will start inserting my own stuff concerning CO2. Sorry if it is unclear shit.
+#ifdef HAS_CO2_SENSOR
+  int co2_value_PWM = 0;
+  int co2_value_UART = 0;
+  byte cmd[9] = {0xFF,0x01,0x86,0x00,0x00,0x00,0x00,0x00,0x79};
+  char response[9];
+  #define pwmPin 7 // PWM pin
+  int prevVal = LOW;
+  long th, tl, h, l, ppm, CO2PWM = 0.0;
+#endif
 
+#ifdef HAS_CO_SENSOR
+  int dangercount = 0;
+#endif
 
 void presentation()
 {
@@ -205,12 +220,15 @@ void setup()
   wait(200);
   
   Serial.println(F("Hello, I am a carbon sensor"));
-
   transmission_state = loadState(DATA_TRANSMISSION_CHILD_ID);
+  
+  //This was in the original script, but uncommenting this will crash the Arduino?:
+  //pinMode(CO2_RX_PIN, INPUT);
+  //pinMode(CO2_TX_PIN, OUTPUT);
 
-  pinMode(CO2_RX_PIN, INPUT);
-  pinMode(CO2_TX_PIN, OUTPUT);
-
+  co2_sensor.begin(9600);
+  pinMode(pwmPin, INPUT);
+  
   pinMode(DATA_TRANSMISSION_BUTTON_PIN, INPUT_PULLUP); // Attach a push button to this pin to toggle whether or not the device is allowed to transmit data to the controller.
 
 
@@ -227,7 +245,7 @@ void setup()
   oled.ssd1306WriteCmd(SSD1306_DISPLAYON);
   oled.setScroll(false);
   oled.setCursor(HORIZONTAL_START_POSITION,0);
-  oled.print(F("CARBON"));
+  oled.print(F("KOOLSTOF")); // ORIGINAL: CARBON
 #endif
 
 
@@ -243,10 +261,25 @@ void setup()
 
   
 #ifdef HAS_CO_SENSOR
-  co_sensor.begin(9600);
+  pinMode(ledPinMQ7CO,OUTPUT);
+  fullheatCOreading();
+  Heatstatus = 0;
+#ifdef DEBUG
+  Serial.print(F("Will test led in 3..."));
+  wait(1000);
+  Serial.print(F("2..."));
+  wait(1000);
+  Serial.println(F("1..."));
+  wait(1000);
+  Serial.println(F("BLINK"));
+#endif
+  digitalWrite(ledPinMQ7CO, HIGH); // test LED
+  delay(1000);
+  digitalWrite(ledPinMQ7CO, LOW);
+  
 #ifdef HAS_DISPLAY
   oled.setCursor(0,screen_vertical_position - 1);   // The labels are shown slightly above the values.
-  oled.print(F("CO PPM:")); 
+  oled.print(F("CO PPB:")); 
   screen_vertical_position = screen_vertical_position + 3;
 #endif
 #endif
@@ -269,6 +302,21 @@ void setup()
   oled.print(F("NO SENSORS ENABLED")); 
 #endif
   while(1);
+#endif
+
+#ifdef HAS_PASSIVE_BUZZER
+#ifdef DEBUG
+  Serial.print(F("PREPARE FOR AUDIO TEST, in 3..."));
+  wait(1000);
+  Serial.print(F("2..."));
+  wait(1000);
+  Serial.println(F("1..."));
+  wait(1000);
+  Serial.println(F("BEEEEP"));
+#endif
+  beep();
+  wait(1000);
+  beep();
 #endif
 
   wdt_enable(WDTO_8S);                              // Starts the watchdog timer. If it is not reset once every few seconds, then the entire device will automatically restart.
@@ -388,7 +436,29 @@ if ( transmission_state != previous_transmission_state ){
         
         // CARBON MONIXODE
 #ifdef HAS_CO_SENSOR
-        COValue = readCOValue();                    // Get carbon monoxide level from sensor module
+        //find out if last cycle was heating or measuring.
+        
+         if (Heatstatus==0) {
+          //if low heat --> measure and heat.
+          //First measurement is UNRELIABLE!
+          COValue = readCOValue();
+          Heatstatus = 1;
+         } else{
+          //if high heating --> go to low heat
+          medheatCOreading();
+          Heatstatus = 0;
+         }
+
+        if (COValue > 3000){
+          //Dangerous CO levels, if I measure this twice (?) activate emergency powers
+          dangercount++;
+          if (dangercount > 1){
+          activate_emergency();
+          }
+        } else {
+          dangercount = 0;
+        }
+
 #ifdef HAS_DISPLAY
         // Show CO level on the screen
         //oled.set1X();
@@ -397,7 +467,7 @@ if ( transmission_state != previous_transmission_state ){
         if (COValue == -1){                         // -1 value means sensor probably not connected
           oled.print(F("CHECK WIRE"));
           oled.clearToEOL();                       
-          break;
+          //break;
         }
         else if (COValue == -2){
           oled.print(F("DATA ERROR"));              // -2 value means we got data form the sensor module was was not a CO2 level. For example, a response to some other command.
@@ -408,13 +478,13 @@ if ( transmission_state != previous_transmission_state ){
           oled.print(COValue);
           oled.clearToEOL();
   
-          // Show quality opinion the screen.
+          // Show quality opinion the screen. MAX 5 LETTERS.
           oled.setCursor(60,screen_vertical_position);
-          if (COValue > 0 && COValue < 450){       oled.print(F("GREAT"));}
-          else if (COValue < 700){  oled.print(F("GOOD"));oled.clearToEOL();}
+          if (COValue > 0 && COValue < 450){       oled.print(F("TOP"));}
+          else if (COValue < 700){  oled.print(F("GOED"));oled.clearToEOL();}
           else if (COValue < 1000){ oled.print(F("OK"));  oled.clearToEOL();}
-          else if (COValue < 2000){ oled.print(F("POOR"));oled.clearToEOL();}
-          else if (COValue < 4500){ oled.print(F("BAD")); oled.clearToEOL();}
+          else if (COValue < 2000){ oled.print(F("MATIG"));oled.clearToEOL();}
+          else if (COValue < 4500){ oled.print(F("NAAR")); oled.clearToEOL();}
           else {
             oled.print(F("Wait.."));
             oled.clearToEOL();
@@ -426,38 +496,47 @@ if ( transmission_state != previous_transmission_state ){
 
         // CARBON DIOXIDE
 #ifdef HAS_CO2_SENSOR
-        //int new_co2_value = readco2_value();      // Get carbon dioxide level from sensor module
-        co2_value = read_co2_value();               // Get carbon dioxide level from sensor module
-        Serial.print(F("fresh co2 value: ")); Serial.println(co2_value);
+        //int new_co2_value = readco2_value();      // Get carbon dioxide level from sensor module - old way of doing this
+        co2_value_UART = readCO2UART();
+        Serial.print(F("fresh UART co2 value: ")); Serial.println(co2_value_UART);
+        #ifdef DEBUG //During normal use, PWM value is unnessecarily complicated.
+          co2_value_PWM = getCO2PWM();               // Get carbon dioxide level from sensor module - PWM
+          Serial.print(F("fresh PWM co2 value: ")); Serial.println(co2_value_PWM);
+        #endif
+        
 #ifdef DEBUG
-        if( co2_value == -1 || co2_value == -2 ){
-          Serial.println(F("SENSOR ERROR -> GENERATING RANDOM DATA")); // Used during development to test even though no actual sensor is attached.
-          co2_value = random(500,600);
+        if( co2_value_PWM == -1 || co2_value_PWM == -2 ){
+          Serial.println(F("PWM SENSOR ERROR")); // Used during development to test even though no actual sensor is attached.
+        //  co2_value = random(500,600);
+        }
+        if( co2_value_UART == -1 || co2_value_UART == -2 ){
+          Serial.println(F("PWM SENSOR ERROR")); // Used during development to test even though no actual sensor is attached.
+        //  co2_value = random(500,600);
         }
 #endif
 
 #ifdef ALLOW_FAKE_DATA
-        if( co2_value > 350 && sending_fake_data == false){ // While fake data is not being created, we analyse the real data to look for the range it displays.
+        if( co2_value_UART > 350 && sending_fake_data == false){ // While fake data is not being created, we analyse the real data to look for the range it displays.
           measurements_fakeness_range_counter++;
           Serial.print(F("measurements_fakeness_range_counter = ")); Serial.println(measurements_fakeness_range_counter);
           if( measurements_fakeness_range_counter >= AMOUNT_OF_MEASUREMENTS_TO_AVERAGE){
-            Serial.print(F("Restarting min-max analysis around co2 value of ")); Serial.println(co2_value);
+            Serial.print(F("Restarting min-max analysis around co2 value of ")); Serial.println(co2_value_UART);
             measurements_fakeness_range_counter = 0;
             if( co2_maximum_found - co2_minimum_found != 0 && co2_maximum_found - co2_minimum_found < 30 ){
               co2_fakeness_range = co2_maximum_found - co2_minimum_found; // What is the difference between the highest and lowest co2 value we spotted recently.
               last_co2_minimum_found = co2_minimum_found;
               last_co2_maximum_found = co2_maximum_found;
             }
-            co2_minimum_found = co2_value;
-            co2_maximum_found = co2_value;
+            co2_minimum_found = co2_value_UART;
+            co2_maximum_found = co2_value_UART;
           }
           
-          if(co2_value < co2_minimum_found){
-            co2_minimum_found = co2_value;
+          if(co2_value_UART < co2_minimum_found){
+            co2_minimum_found = co2_value_UART;
             Serial.println(F("new co2 value was smaller than minimum found."));
           }
-          else if(co2_value > co2_maximum_found){
-            co2_maximum_found = co2_value;
+          else if(co2_value_UART > co2_maximum_found){
+            co2_maximum_found = co2_value_UART;
             Serial.println(F("new co2 value was bigger than maximum found."));
           }
           else{
@@ -477,24 +556,24 @@ if ( transmission_state != previous_transmission_state ){
               co2_fakeness_range = 1;               // The minimum to actually make some fake jitter
             }
             co2_fake_data_movement_factor = -0.5;
-            fake_co2_value = co2_value;             // The initial fake value;
+            fake_co2_value = co2_value_UART;             // The initial fake value;
           }
         }
         else{
           // The user no longer wants to generate fake data.
           if( sending_fake_data == true ){ // If we were generating fake data, we should slowly move the fake value towards the real value. Only then can we stop generating the fake value.
-            last_co2_minimum_found = co2_value - co2_fakeness_range;
-            last_co2_maximum_found = co2_value + co2_fakeness_range;
+            last_co2_minimum_found = co2_value_UART - co2_fakeness_range;
+            last_co2_maximum_found = co2_value_UART + co2_fakeness_range;
             
-            if(co2_value > fake_co2_value){
+            if(co2_value_UART > fake_co2_value){
               co2_fake_data_movement_factor = -0.1;  // By modifiying this factor to favour one direction, the fake data will move towards the real co2 value.
               Serial.println(F("stopping faking, movement factor set to 0,9: "));
             }
-            else if(co2_value < fake_co2_value){
+            else if(co2_value_UART < fake_co2_value){
               Serial.println(F("stopping faking, movement factor set to -0,9: "));
               co2_fake_data_movement_factor = -0.9;
             }
-            if( abs(fake_co2_value - co2_value) < co2_fakeness_range ){ // When the fake value is very close to the real value, the real value can take over again.
+            if( abs(fake_co2_value - co2_value_UART) < co2_fakeness_range ){ // When the fake value is very close to the real value, the real value can take over again.
               Serial.println(F("Faking has ended"));
               sending_fake_data = false;
             }
@@ -530,7 +609,7 @@ if ( transmission_state != previous_transmission_state ){
           Serial.print(F("fake CO2 addition after bounds check: ")); Serial.println(fake_co2_jitter);
 
           fake_co2_value = fake_co2_value + fake_co2_jitter;
-          co2_value = int(fake_co2_value);
+          co2_value_UART = int(fake_co2_value);
           /*
           // Create meandering data effect
           if( flipped_coin == 0 && fake_co2_value + fake_co2_jitter > average_co2_value + co2_fakeness_range ){ // Check if there is head room to make the fake data value change in the random direction.
@@ -544,7 +623,7 @@ if ( transmission_state != previous_transmission_state ){
             fake_co2_value = fake_co2_value + fake_co2_jitter;
           }
           */
-          Serial.print(F("  {}{}{} Fake CO2 value: ")); Serial.println(co2_value);
+          Serial.print(F("  {}{}{} Fake CO2 value: ")); Serial.println(co2_value_UART);
 
         }
 #endif // End of allow fake data
@@ -556,27 +635,27 @@ if ( transmission_state != previous_transmission_state ){
         oled.set2X();
         oled.setCursor(HORIZONTAL_START_POSITION,screen_vertical_position);
         
-        if (co2_value == -1){                       // -1 value means sensor probably not connected
+        if (co2_value_UART == -1){                       // -1 value means sensor probably not connected
           oled.print(F("CHECK WIRE"));
           oled.clearToEOL();
         }
-        else if (co2_value == -2){
+        else if (co2_value_UART == -2){
           oled.print(F("DATA ERROR"));              // -2 value means we got data form the sensor module was was not a CO2 level. For example, a response to some other command.
           oled.clearToEOL();
         }
-        else if( co2_value > 350 &&  co2_value < 5001){
+        else if( co2_value_UART > 350 &&  co2_value_UART < 5001){
           // Display CO2 value.
-          oled.print(co2_value);
+          oled.print(co2_value_UART);
           oled.clearToEOL();
   
-          // Show quality opinion the screen.
+          // Show quality opinion the screen. Max 5 letters
           oled.setCursor(60,screen_vertical_position);
 
-          if (co2_value < 500){       oled.print(F("GREAT"));}
-          else if (co2_value < 700){  oled.print(F("GOOD"));}
-          else if (co2_value < 1000){ oled.print(F("OK"));}
-          else if (co2_value < 2000){ oled.print(F("POOR"));}
-          else if (co2_value < 5001){ oled.print(F("BAD"));}
+          if (co2_value_UART < 500){       oled.print(F("TOP"));}
+          else if (co2_value_UART < 700){  oled.print(F("GOED"));}
+          else if (co2_value_UART < 1000){ oled.print(F("OK"));}
+          else if (co2_value_UART < 2000){ oled.print(F("MATIG"));}
+          else if (co2_value_UART < 5001){ oled.print(F("NAAR"));}
           else {
             oled.print(F("Wait.."));
           }
@@ -608,21 +687,21 @@ if ( transmission_state != previous_transmission_state ){
 
 
 #ifdef HAS_CO2_SENSOR
-      if( co2_value > 300 && co2_value < 4500 ){    // Avoid sending erroneous values
+      if( co2_value_UART > 300 && co2_value_UART < 4500 ){    // Avoid sending erroneous values
 #ifdef ALLOW_CONNECTING_TO_NETWORK
         if( transmission_state ){
           connected_to_network = false;             // If the network connection is ok, then this will be immediately set back to true.
-          Serial.print(F("Sending CO2 value: ")); Serial.println(co2_value); 
+          Serial.print(F("Sending CO2 value: ")); Serial.println(co2_value_UART); 
           connected_to_network = false;             // If the network connection is ok, then this will be immediately set back to true:
-          send(CO2_message.setSensor(CO2_CHILD_ID).set(co2_value),1); // We send the data, and ask the controller to acknowledge that it has received the data.
+          send(CO2_message.setSensor(CO2_CHILD_ID).set(co2_value_UART),1); // We send the data, and ask the controller to acknowledge that it has received the data.
           wait(RADIO_DELAY);
 
           // Also send the human readable opinion
-          if (co2_value < 450){       send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Great") )); }
-          else if (co2_value < 700){  send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Good") )); }
-          else if (co2_value < 1000){ send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("OK") )); }
-          else if (co2_value < 2000){ send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Poor") )); }
-          else if (co2_value < 5000){ send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Bad") )); }
+          if (co2_value_UART < 450){       send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Erg Goed") )); }
+          else if (co2_value_UART < 700){  send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Goed") )); }
+          else if (co2_value_UART < 1000){ send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Prima") )); }
+          else if (co2_value_UART < 2000){ send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Matig") )); }
+          else if (co2_value_UART < 5000){ send(info_message.setSensor(CO2_OPINION_CHILD_ID).set( F("Slecht") )); }
           
         }
         else{
@@ -676,83 +755,167 @@ if ( transmission_state != previous_transmission_state ){
   }
 }
 
+#ifdef HAS_CO2_SENSOR
+long getCO2PWM(){ // Function to get CO2 PWM value
+  int j; 
+  j = 0;
+  do {
+    #ifdef DEBUG
+      Serial.print("Listening on CO2 PWM...  ");
+    #endif
+    th = pulseIn(pwmPin, HIGH, 1004000) / 1000;
+    tl = 1004 - th;
+    CO2PWM = 5000 * (th-2)/(th+tl-4);
+    j++;
+    #ifdef DEBUG
+      Serial.println("Response was: ");
+      Serial.print(th);
+      Serial.print(". Corresponding ppm value: ");
+      Serial.print(CO2PWM);
+    #endif
+    delay(1000); // be nice to the sensor.
+    //Serial.println("Start next try in 1s");
+    } while ( (CO2PWM < 0.0) && (j<3) ); // Beware CO2PWM<0 can be max out or error.
+    if(th == 0){
+      Serial.println("Error in measurement, better luck next time...");
+    };
+  return CO2PWM;
+}
 
+float readCO2UART(){
+  byte cmd[9] = {0xFF,0x01,0x86,0x00,0x00,0x00,0x00,0x00,0x79};
+  byte response[9]; // for answer
+  #ifdef DEBUG
+    Serial.println("Sending CO2 UART request...");
+  #endif
+  co2_sensor.write(cmd, 9); //request PPM CO2
+  #ifdef DEBUG
+    Serial.println("Request send.");
+  #endif
+  // clear the buffer
+  memset(response, 0, 9);
+  int i = 0;
+  #ifdef DEBUG
+    Serial.println("Into the loop.");
+  #endif
+  while ( (co2_sensor.available() == 0) && (i<5) ) {
+    Serial.print("Waiting for response ");
+    Serial.print(i);
+    Serial.println(" s");
+    delay(1000);
+    i++;
+  }
+  #ifdef DEBUG
+    Serial.println("Out of the loop");
+  #endif
+  if (co2_sensor.available() > 0) {
+      co2_sensor.readBytes(response, 9);
+  } else{
+    Serial.println("Some error occured during reading, just wait for next loop");
+    return -1.0;
+  }
+  
+  // print out the response in hexa
+  #ifdef DEBUG
+    for (int i = 0; i < 9; i++) {
+      Serial.print(String(response[i], HEX));
+      Serial.print("   ");
+    }
+    Serial.println("");
+  #endif
+  
+  // checksum
+  byte check = getCheckSum(response);
+  if (response[8] != check) {
+    Serial.println("Checksum not OK!");
+    Serial.print("Received: ");
+    Serial.println(response[8]);
+    Serial.print("Should be: ");
+    Serial.println(check);
+  }
+ 
+  // ppm
+  int ppm_uart = 256 * (int)response[2] + response[3];
+  #ifdef DEBUG
+    Serial.print("PPM UART: ");
+    Serial.println(ppm_uart);
+  #endif
+  
+  // temp
+  byte temp = response[4] - 40;
+  #ifdef DEBUG
+    Serial.print("Temperature? ");
+    Serial.println(temp);
+  #endif
+  
+  // status
+  byte status = response[5];
+  #ifdef DEBUG
+    Serial.print("Status? ");
+    Serial.println(status);
+    if (status == 0x40) {
+      Serial.println("Status OK");
+    }
+  #endif
+  return ppm_uart;
+}
+#endif
 
 #ifdef HAS_CO_SENSOR
-int readCOValue()
-{
+// see https://www.hackster.io/ingo-lohs/gas-sensor-carbon-monoxide-mq-7-aka-flying-fish-e58457, https://www.instructables.com/id/Arduino-CO-Monitor-Using-MQ-7-Sensor/
+//BAsically: START --> fullheatCOreading--> wait 60 sec --> medheatCOreading --> wait 90 sec --> readCOValue --> wait 60 seconds (or more) --> medheatCOreading --> wait 90 sec --> readCOValue --> etc.
+void fullheatCOreading(){
+  // turn the heater fully on, burn of CO on plate. HEAT FOR AT LEAST 1 minute. 
+  Serial.println("Turn the CO heater to full");
+  analogWrite(analogMQ7CO, HIGH);
+}
 
-  while (co_sensor.read()!=-1) {};                  // Clear serial buffer  
+void medheatCOreading(){
+  // turn the heater lower, let CO accumulate on plate and measure. TIMING IS IMPORTANT! Heat for 90 seconds!!
+    Serial.println("Turn the CO heater to medium");
+  analogWrite(analogMQ7CO, 71.4);
+}
 
-  char response[9];                                   // Holds response from sensor
-  byte requestReading[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
-  
-  Serial.println(F("Requesting data from CO sensor module"));
-  co_sensor.write(requestReading, 9);               // Request PPM CO 
-  co_sensor.readBytes(response, 9);
+int readCOValue(){
+  // CO2 via MQ7: we need to read the sensor at 5V, but must not let it heat up (CO will detatch). So hurry!
+  Serial.println("Turn the CO heater to high and measure");
+  analogWrite(analogMQ7CO, HIGH); 
+  delay(50); // Getting an analog read apparently takes 100uSec
+  COValue = analogRead(analogMQ7CO);     
+  Serial.println("CO value measured:");
+  Serial.println(COValue);
+  return COValue;
+}
 
-  // Do some checks on the response:
-  if (byte(response[0]) != 0xFF){
-    Serial.println(F("! Sensor not connected?"));
-    while (co_sensor.read()!=-1) {};                // Empty the serial buffer, for a fresh start, just in case.
-    return -1;
+void activate_emergency(){
+  // In case of high CO levels, make sure to sound the alarms
+  while (true){
+    // give auditory warning
+    beep();
+    // give a heartbeat so arduino stays alive
+    wdt_reset();
+    // LED ON
+    digitalWrite(ledPinMQ7CO, HIGH);     
+    delay(1000);
+    //LED OFF
+    digitalWrite(ledPinMQ7CO, LOW);
+    delay(1000);
   }
-  if (byte(response[1]) != 0x86){
-    Serial.println(F("! Sensor did not send CO data"));
-    return -2;
-  }
-  // Did the data get damaged along the way?
-  char check = getCheckSum(response);
-  if (response[8] != check) {
-    Serial.println(F("ERROR: checksum did not match"));
-    return -2;
-  }  
+}
 
-  int high = response[2];
-  int low = response[3];
-  return high * 256 + low;
+#endif
+
+#ifdef HAS_PASSIVE_BUZZER
+void beep(){
+  tone(BUZPIN, 4978, 250);
+  wait(300);
+  noTone(BUZPIN);
+  tone(BUZPIN,41,250);
+  wait(300);
+  noTone(BUZPIN);
+  digitalWrite(BUZPIN, HIGH);
 }
 #endif
-
-
-#ifdef HAS_CO2_SENSOR
-int read_co2_value()
-{
-
-  while (co2_sensor.read()!=-1) {};                    // Clear serial buffer  
-
-  char response[9];                                 // Holds response from sensor
-  byte requestReading[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
-  
-  Serial.println(F("Requesting data from CO2 sensor module"));
-  co2_sensor.write(requestReading, 9);                 // Request data from sensor module.
-  co2_sensor.readBytes(response, 9);
-
-  // Do some checks on the response:
-  if (byte(response[0]) != 0xFF){
-    Serial.println(F("! Is the CO2 sensor connected?"));
-    return -1;
-  }
-  if (byte(response[1]) != 0x86){
-    Serial.println(F("! Non-sensor data"));
-#ifdef DEBUG
-    Serial.println(response[1]);
-#endif
-    return -2;
-  }
-  // Did the data get damaged along the way?
-  char check = getCheckSum(response);
-  if (response[8] != check) {
-    Serial.println(F("! Corrupted data"));
-    return -2;
-  }  
-
-  int high = response[2];
-  int low = response[3];
-  return high * 256 + low;
-}
-#endif
-
 
 #ifdef ALLOW_CONNECTING_TO_NETWORK
 void receive(const MyMessage &message)

@@ -1,0 +1,4 @@
+Weird stuff:
+Debugging 1: UART works
+Debugging 2: PWM  works
+WHYYYY
