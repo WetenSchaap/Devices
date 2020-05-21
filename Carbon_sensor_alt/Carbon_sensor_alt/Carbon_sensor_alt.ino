@@ -170,8 +170,8 @@ boolean send_all_values = true;                     // If the controller asks th
 
 // Here I will start inserting my own stuff concerning CO2. Sorry if it is unclear shit.
 #ifdef HAS_CO2_SENSOR
-  int co2_value_PWM = 0;
-  int co2_value_UART = 0;
+  int co2_value_PWM = 100; // Random reasonable values to start with.
+  int co2_value_UART = 500;
   byte cmd[9] = {0xFF,0x01,0x86,0x00,0x00,0x00,0x00,0x00,0x79};
   char response[9];
   #define pwmPin 7 // PWM pin
@@ -267,9 +267,9 @@ void setup()
   wait(1000);
   Serial.println(F("BLINK"));
 #endif
-  digitalWrite(ledPinMQ7CO, HIGH); // test LED
+  digitalWrite(ledPinMQ7CO, LOW); // test LED
   delay(1000);
-  digitalWrite(ledPinMQ7CO, LOW);
+  digitalWrite(ledPinMQ7CO, HIGH);
   
 #ifdef HAS_DISPLAY
   oled.setCursor(0,screen_vertical_position - 1);   // The labels are shown slightly above the values.
