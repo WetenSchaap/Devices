@@ -26,7 +26,7 @@
 
 
 // Enable MySensors debug output to the serial monitor, so you can check if the radio is working ok.
-//#define MY_DEBUG 
+#define MY_DEBUG 
 
 #ifdef RF_NANO
 // If you are using an RF-Nano, you have to switch CE and CS pins.

@@ -24,11 +24,11 @@
 
 #define HAS_PASSIVE_BUZZER                          // Does the sensor have a passive buzzer?
 
-//#define ALLOW_CONNECTING_TO_NETWORK                 // Connect wirelessly. Is this device allowed to connect to the local Candle network? For privacy or security reasons you may prefer a stand-alone device.
+#define ALLOW_CONNECTING_TO_NETWORK                 // Connect wirelessly. Is this device allowed to connect to the local Candle network? For privacy or security reasons you may prefer a stand-alone device.
 
 //#define ALLOW_FAKE_DATA                             // Allow fake data? This feature is designed to make the sensor less intrusive in some social situations. If enabled, you can toggle this ability by pressing a button that you will need to connect as well. When fake data is being generated, a small F icon is visible on the display.
 
-//#define MY_REPEATER_FEATURE                       // Act as a repeater? The devices can pass along messages to each other to increase the range of your network.
+#define MY_REPEATER_FEATURE                       // Act as a repeater? The devices can pass along messages to each other to increase the range of your network.
 
 #define RF_NANO                                     // RF-Nano. Check this box if you are using the RF-Nano Arduino, which has a built in radio. The Candle project uses the RF-Nano.
 
@@ -36,7 +36,7 @@
  *
  */
 
-//#define DEBUG
+#define DEBUG
 //#define MY_DEBUG // MySensors debugging. Enable MySensors debug output to the serial monitor, so you can check if the radio is working ok.
 
 // Enable and select the attached radio type
@@ -84,13 +84,9 @@
 #define MY_RF24_CE_PIN 10                           // Used by the MySensors library.
 #endif
 
-
-
-
 // LIBRARIES (in the Arduino IDE go to Sketch -> Include Library -> Manage Libraries to add these if you don't have them installed yet.)
 #include <MySensors.h>                              // MySensors library                  
 #include <SoftwareSerial.h>                         // Serial data connection to the sensor
-
 
 #ifdef HAS_DISPLAY
   #define OLED_I2C_ADDRESS 0x3C
@@ -231,7 +227,6 @@ void setup()
   
   pinMode(DATA_TRANSMISSION_BUTTON_PIN, INPUT_PULLUP); // Attach a push button to this pin to toggle whether or not the device is allowed to transmit data to the controller.
 
-
 #ifdef ALLOW_FAKE_DATA
   pinMode(TOGGLE_FAKE_DATA_PIN, INPUT_PULLUP);
   //Serial.print(F("Toggle fake-data-mode using a button on pin ")); Serial.println(TOGGLE_FAKE_DATA_PIN);
@@ -259,7 +254,6 @@ void setup()
   }
 #endif 
 
-  
 #ifdef HAS_CO_SENSOR
   pinMode(ledPinMQ7CO,OUTPUT);
   fullheatCOreading();
@@ -328,19 +322,19 @@ void send_values()
 {
   send(relaymsg.setSensor(DATA_TRANSMISSION_CHILD_ID).set(transmission_state)); wait(RADIO_DELAY);
 #ifdef HAS_CO_SENSOR
-  send(prefix_message.setSensor(CO_CHILD_ID).set( F("ppm") )); delay(RADIO_DELAY); // Carbon values are always transmitted. They are not a large privacy risk, while being very important to safety.
+  send(prefix_message.setSensor(CO_CHILD_ID).set( "ppb" )); delay(RADIO_DELAY); // Carbon values are always transmitted. They are not a large privacy risk, while being very important to safety.
   if( COValue != 0 ){
     send(CO_message.setSensor(CO_CHILD_ID).set(COValue),1);
   }
 #endif
-  if(transmission_state){
+//  if(transmission_state){
 #ifdef HAS_CO2_SENSOR
-    send(prefix_message.setSensor(CO2_CHILD_ID).set( F("ppm") )); delay(RADIO_DELAY);
-    if(co2_value > 350){
-      send(CO2_message.setSensor(CO2_CHILD_ID).set(co2_value),1);
+    send(prefix_message.setSensor(CO2_CHILD_ID).set( "ppm" )); delay(RADIO_DELAY);
+    if(co2_value > 25){
+      send(CO2_message.setSensor(CO2_CHILD_ID).set(co2_value_UART),1);
     }
 #endif
-  }
+//  }
 }
 #endif
 
@@ -648,7 +642,7 @@ if ( transmission_state != previous_transmission_state ){
           oled.print(co2_value_UART);
           oled.clearToEOL();
   
-          // Show quality opinion the screen. Max 5 letters
+          // Show quality opinion the screen. Max 5 symbols.
           oled.setCursor(60,screen_vertical_position);
 
           if (co2_value_UART < 500){       oled.print(F("TOP"));}
@@ -687,12 +681,11 @@ if ( transmission_state != previous_transmission_state ){
 
 
 #ifdef HAS_CO2_SENSOR
-      if( co2_value_UART > 300 && co2_value_UART < 4500 ){    // Avoid sending erroneous values
+      if( co2_value_UART > 0 && co2_value_UART < 4500 ){    // Avoid sending erroneous values
 #ifdef ALLOW_CONNECTING_TO_NETWORK
         if( transmission_state ){
           connected_to_network = false;             // If the network connection is ok, then this will be immediately set back to true.
           Serial.print(F("Sending CO2 value: ")); Serial.println(co2_value_UART); 
-          connected_to_network = false;             // If the network connection is ok, then this will be immediately set back to true:
           send(CO2_message.setSensor(CO2_CHILD_ID).set(co2_value_UART),1); // We send the data, and ask the controller to acknowledge that it has received the data.
           wait(RADIO_DELAY);
 
