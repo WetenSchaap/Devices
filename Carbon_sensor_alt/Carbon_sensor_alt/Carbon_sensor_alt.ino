@@ -36,7 +36,7 @@
  *
  */
 
-#define DEBUG
+//#define DEBUG
 //#define MY_DEBUG // MySensors debugging. Enable MySensors debug output to the serial monitor, so you can check if the radio is working ok.
 
 // Enable and select the attached radio type
@@ -366,7 +366,9 @@ void loop()
   if( transmission_button_state == 0 ){             // If the button is being pressed
     transmission_state = !transmission_state;       // Switch the setting to its opposive value.
     saveState(DATA_TRANSMISSION_CHILD_ID, transmission_state); // Store the new preference, so that is the device is rebooted, it will still be correct.
+    #ifdef DEBUG
     Serial.println(F("Data transmission button pressed "));
+    #endif
     wait(500); // Wait a while to allow the button to be released
 #ifdef ALLOW_CONNECTING_TO_NETWORK
       
@@ -377,7 +379,9 @@ void loop()
 if ( transmission_state != previous_transmission_state ){
     previous_transmission_state = transmission_state;
     saveState(DATA_TRANSMISSION_CHILD_ID, transmission_state);
+    #ifdef DEBUG
     Serial.print(F("Sending new data transmission state: ")); Serial.println(transmission_state);
+    #endif
     send(relaymsg.setSensor(DATA_TRANSMISSION_CHILD_ID).set(transmission_state));
 }
 
@@ -399,7 +403,9 @@ if ( transmission_state != previous_transmission_state ){
     Serial.print("loopcounter:"); Serial.println(loopCounter);
 #endif
     if(loopCounter >= MEASUREMENT_INTERVAL){
+      #ifdef DEBUG
       Serial.println(); Serial.println(F("__starting__"));  
+      #endif
       loopCounter = 0;
     }
 
@@ -491,8 +497,10 @@ if ( transmission_state != previous_transmission_state ){
         // CARBON DIOXIDE
 #ifdef HAS_CO2_SENSOR
         //int new_co2_value = readco2_value();      // Get carbon dioxide level from sensor module - old way of doing this
-        co2_value_UART = readCO2UART();
+        int co2_value_UART = static_cast<int>(readCO2UART());
+        #ifdef DEBUG
         Serial.print(F("fresh UART co2 value: ")); Serial.println(co2_value_UART);
+        #endif
         #ifdef DEBUG //During normal use, PWM value is unnessecarily complicated.
           co2_value_PWM = getCO2PWM();               // Get carbon dioxide level from sensor module - PWM
           Serial.print(F("fresh PWM co2 value: ")); Serial.println(co2_value_PWM);
@@ -626,6 +634,7 @@ if ( transmission_state != previous_transmission_state ){
 
 #ifdef HAS_DISPLAY
         // Show CO2 level on the screen 
+        co2_value_UART = static_cast<int>(readCO2UART());
         oled.set2X();
         oled.setCursor(HORIZONTAL_START_POSITION,screen_vertical_position);
         
@@ -673,7 +682,9 @@ if ( transmission_state != previous_transmission_state ){
       if( COValue > 0 && COValue < 4500 ){          // Avoid sending erroneous values
 #ifdef ALLOW_CONNECTING_TO_NETWORK
           connected_to_network = false;
+          #ifdef DEBUG
           Serial.println(F("Sending CO to controller"));
+          #endif
           send(CO_message.setSensor(CO_CHILD_ID).set(COValue),1); // We ask the controller to acknowledge that it has received the data.  
 #endif // end of allow connecting to network
       }
@@ -681,11 +692,14 @@ if ( transmission_state != previous_transmission_state ){
 
 
 #ifdef HAS_CO2_SENSOR
+      co2_value_UART = static_cast<int>(readCO2UART());
       if( co2_value_UART > 0 && co2_value_UART < 4500 ){    // Avoid sending erroneous values
 #ifdef ALLOW_CONNECTING_TO_NETWORK
         if( transmission_state ){
           connected_to_network = false;             // If the network connection is ok, then this will be immediately set back to true.
+          #ifdef DEBUG
           Serial.print(F("Sending CO2 value: ")); Serial.println(co2_value_UART); 
+          #endif
           send(CO2_message.setSensor(CO2_CHILD_ID).set(co2_value_UART),1); // We send the data, and ask the controller to acknowledge that it has received the data.
           wait(RADIO_DELAY);
 
@@ -792,9 +806,11 @@ float readCO2UART(){
     Serial.println("Into the loop.");
   #endif
   while ( (co2_sensor.available() == 0) && (i<5) ) {
+    #ifdef DEBUG
     Serial.print("Waiting for response ");
     Serial.print(i);
     Serial.println(" s");
+    #endif
     delay(1000);
     i++;
   }
@@ -804,7 +820,9 @@ float readCO2UART(){
   if (co2_sensor.available() > 0) {
       co2_sensor.readBytes(response, 9);
   } else{
+    #ifdef DEBUG
     Serial.println("Some error occured during reading, just wait for next loop");
+    #endif
     return -1.0;
   }
   
@@ -859,24 +877,32 @@ float readCO2UART(){
 //BAsically: START --> fullheatCOreading--> wait 60 sec --> medheatCOreading --> wait 90 sec --> readCOValue --> wait 60 seconds (or more) --> medheatCOreading --> wait 90 sec --> readCOValue --> etc.
 void fullheatCOreading(){
   // turn the heater fully on, burn of CO on plate. HEAT FOR AT LEAST 1 minute. 
+  #ifdef DEBUG
   Serial.println("Turn the CO heater to full");
+  #endif
   analogWrite(analogMQ7CO, HIGH);
 }
 
 void medheatCOreading(){
   // turn the heater lower, let CO accumulate on plate and measure. TIMING IS IMPORTANT! Heat for 90 seconds!!
+    #ifdef DEBUG
     Serial.println("Turn the CO heater to medium");
+    #endif
   analogWrite(analogMQ7CO, 71.4);
 }
 
 int readCOValue(){
   // CO2 via MQ7: we need to read the sensor at 5V, but must not let it heat up (CO will detatch). So hurry!
+  #ifdef DEBUG
   Serial.println("Turn the CO heater to high and measure");
+  #endif
   analogWrite(analogMQ7CO, HIGH); 
   delay(50); // Getting an analog read apparently takes 100uSec
   COValue = analogRead(analogMQ7CO);     
+  #ifdef DEBUG
   Serial.println("CO value measured:");
   Serial.println(COValue);
+  #endif
   return COValue;
 }
 
@@ -917,13 +943,17 @@ void receive(const MyMessage &message)
   connected_to_network = true;
   
   if( message.isAck() ){
+    #ifdef DEBUG
     Serial.println(F("-Got echo"));
+    #endif
     return;
   }
 
   if (message.type == V_STATUS && message.sensor == DATA_TRANSMISSION_CHILD_ID ){
     transmission_state = message.getBool(); //?RELAY_ON:RELAY_OFF;
+    #ifdef DEBUG
     Serial.print(F("-New desired transmission state: ")); Serial.println(transmission_state);
+    #endif
   }  
 }
 #endif
